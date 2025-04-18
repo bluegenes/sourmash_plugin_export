@@ -8,7 +8,7 @@ pub fn export_revindex_to_parquet(db_path: &Utf8Path, out_path: &Utf8Path, rw: b
     println!("Opening DB (rw mode? {})", rw);
     let revindex = RevIndex::open(db_path, !rw, None)
         .map_err(|e| anyhow::anyhow!("cannot open RocksDB database. Error is: {e}"))?;
-    
+
     let revindex = match revindex {
         RevIndex::Plain(db) => db,
         // optionally handle other variants
@@ -59,7 +59,7 @@ pub fn export_revindex_to_parquet(db_path: &Utf8Path, out_path: &Utf8Path, rw: b
             Some((hash, dataset_names))
         })
         .collect();
-    
+
     let hashes: Vec<u64> = results.iter().map(|(h, _)| *h).collect();
     let dataset_lists: Vec<Option<Vec<String>>> = results
         .iter()

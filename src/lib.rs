@@ -1,4 +1,4 @@
-use camino:: Utf8PathBuf;
+use camino::Utf8PathBuf;
 
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
@@ -38,11 +38,7 @@ pub fn is_revindex_database(path: &Utf8PathBuf) -> bool {
 
 #[pyfunction]
 #[pyo3(signature = (db, output, rw = false))]
-fn do_export_to_parquet(
-    db: String,
-    output: String,
-    rw: bool,
-) -> anyhow::Result<u8> {
+fn do_export_to_parquet(db: String, output: String, rw: bool) -> anyhow::Result<u8> {
     let db_path = Utf8PathBuf::from(db);
     let output_path = Utf8PathBuf::from(output);
 
@@ -59,9 +55,8 @@ fn do_export_to_parquet(
     }
 }
 
-
 #[pymodule]
-fn  sourmash_plugin_export(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
+fn sourmash_plugin_export(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(do_export_to_parquet, m)?)?;
     m.add_function(wrap_pyfunction!(set_global_thread_pool, m)?)?;
     Ok(())
