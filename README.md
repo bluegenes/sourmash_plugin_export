@@ -1,12 +1,11 @@
-# sourmash_plugin_export
+# 2025-database-explore
 
-Export sourmash signatures to other formats
+Export sourmash signatures to parquet for exploration
 
 ## About
+
+Plugin format, because python frontends are nice.
 
 Commands:
 
 - `toparquet` - export to parquet format
-
-
-**(Not Ready for Public Use)**
