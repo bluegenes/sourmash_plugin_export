@@ -13,6 +13,7 @@ updates:
     - dependency-type: "direct"
   ignore:
     - dependency-name: "chrono"
+    - dependency-name: "polars"
   open-pull-requests-limit: 10
 - package-ecosystem: "github-actions"
   directory: "/"
