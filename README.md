@@ -1,11 +1,9 @@
-# 2025-database-explore
+# sourmash_plugin_export
 
-Export sourmash signatures to parquet for exploration
+Experimental plugin for exporting sourmash signatures to other formats for exploration
 
 ## About
 
-Plugin format, because python frontends are nice.
-
 Commands:
 
-- `toparquet` - export to parquet format
+- `toparquet` - export rocksdb to parquet format
