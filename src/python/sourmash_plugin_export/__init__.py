@@ -63,6 +63,10 @@ class ToParquet(CommandLinePlugin):
             help="Output file name (parquet).",
         )
         p.add_argument(
+            "--taxonomy",
+            help="Taxonomy CSV file (optional).",
+        )
+        p.add_argument(
             "-c",
             "--cores",
             default=0,
@@ -87,6 +91,7 @@ class ToParquet(CommandLinePlugin):
         status = sourmash_plugin_export.do_export_to_parquet(
             args.database,
             args.output,
+            args.taxonomy,
             False,
         )
 

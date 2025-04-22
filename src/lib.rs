@@ -37,16 +37,22 @@ pub fn is_revindex_database(path: &Utf8PathBuf) -> bool {
 }
 
 #[pyfunction]
-#[pyo3(signature = (db, output, rw = false))]
-fn do_export_to_parquet(db: String, output: String, rw: bool) -> anyhow::Result<u8> {
+#[pyo3(signature = (db, output, tax = None, rw = false))]
+fn do_export_to_parquet(
+    db: String,
+    output: String,
+    tax: Option<String>,
+    rw: bool,
+) -> anyhow::Result<u8> {
     let db_path = Utf8PathBuf::from(db);
     let output_path = Utf8PathBuf::from(output);
+    let tax_path = tax.map(Utf8PathBuf::from);
 
     if !is_revindex_database(&db_path) {
         bail!("'{}' is not a valid RevIndex database", &db_path);
     }
 
-    match export_revindex_to_parquet(&db_path, &output_path, rw) {
+    match export_revindex_to_parquet(&db_path, &output_path, tax_path.as_deref(), rw) {
         Ok(_) => Ok(0),
         Err(e) => {
             eprintln!("Error: {e}");

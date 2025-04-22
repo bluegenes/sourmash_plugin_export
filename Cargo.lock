@@ -2384,10 +2384,12 @@ dependencies = [
  "anyhow",
  "byteorder",
  "camino",
+ "csv",
  "polars",
  "pyo3",
  "rayon",
  "rocksdb",
+ "serde",
  "sourmash",
 ]
 
