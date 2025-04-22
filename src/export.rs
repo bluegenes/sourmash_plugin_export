@@ -20,6 +20,38 @@ struct TaxonomyRow {
     species: Option<String>,
 }
 
+fn compute_lca_strs(taxonomies: &[String]) -> (String, Option<&'static str>) {
+    if taxonomies.is_empty() {
+        return (String::new(), None);
+    }
+
+    let rank_names = [
+        "domain", "phylum", "class", "order", "family", "genus", "species",
+    ];
+
+    let split_taxonomies: Vec<Vec<&str>> =
+        taxonomies.iter().map(|s| s.split(';').collect()).collect();
+
+    let first = &split_taxonomies[0];
+    let mut lca = Vec::new();
+    let mut lca_rank = None;
+
+    for i in 0..first.len() {
+        let val = first[i];
+        if split_taxonomies
+            .iter()
+            .all(|parts| parts.get(i) == Some(&val))
+        {
+            lca.push(val);
+            lca_rank = rank_names.get(i).copied(); // update LCA rank name
+        } else {
+            break;
+        }
+    }
+
+    (lca.join(";"), lca_rank)
+}
+
 fn load_taxonomy_map(path: &Utf8Path) -> Result<HashMap<String, String>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -76,7 +108,7 @@ pub fn export_revindex_to_parquet(
     let cf = db.cf_handle("hashes").expect("Missing 'hashes' CF");
 
     // collect hash + dataset name list
-    let results: Vec<(u64, Vec<String>, Vec<String>)> = db
+    let results: Vec<(u64, Vec<String>, Vec<String>, String, Option<&str>)> = db
         .iterator_cf(&cf, rocksdb::IteratorMode::Start)
         .filter_map(|res| res.ok())
         .filter_map(|(k, v)| {
@@ -120,19 +152,26 @@ pub fn export_revindex_to_parquet(
                 .cloned()
                 .collect();
 
-            Some((hash, dataset_names, taxonomy_list))
+            // compute lca
+            let (lca_lineage, lca_rank) = compute_lca_strs(&taxonomy_list);
+
+            Some((hash, dataset_names, taxonomy_list, lca_lineage, lca_rank))
         })
         .collect();
 
-    let hashes: Vec<u64> = results.iter().map(|(h, _, _)| *h).collect();
-    let dataset_lists: Vec<Option<Vec<String>>> = results
-        .iter()
-        .map(|(_, names, _)| Some(names.clone()))
-        .collect();
-    let taxonomy_lists: Vec<Option<Vec<String>>> = results
-        .iter()
-        .map(|(_, _, tax)| Some(tax.clone()))
-        .collect();
+    let mut hashes = Vec::with_capacity(results.len());
+    let mut dataset_lists = Vec::with_capacity(results.len());
+    let mut taxonomy_lists = Vec::with_capacity(results.len());
+    let mut lca_lineage = Vec::with_capacity(results.len());
+    let mut lca_rank = Vec::with_capacity(results.len());
+
+    for (h, d, t, l, r) in results {
+        hashes.push(h);
+        dataset_lists.push(Some(d));
+        taxonomy_lists.push(Some(t));
+        lca_lineage.push(l);
+        lca_rank.push(r);
+    }
 
     eprintln!("Collected {} hashes. Now making parquet.", hashes.len());
 
@@ -152,11 +191,76 @@ pub fn export_revindex_to_parquet(
         .collect();
     let taxonomy_chunked = taxonomy_chunked.with_name("taxonomy_list");
     let taxonomy_series = taxonomy_chunked.into_series();
+    let lca_lineage_series = Series::new("lca_lineage", lca_lineage);
+    let lca_rank_series = Series::new("lca_rank", lca_rank);
 
-    let mut df = DataFrame::new(vec![hash_series, datasets_series, taxonomy_series])?;
+    let df = DataFrame::new(vec![
+        hash_series,
+        datasets_series,
+        taxonomy_series,
+        lca_lineage_series,
+        lca_rank_series,
+    ])?;
 
     let mut file = std::fs::File::create(out_path)?;
     ParquetWriter::new(&mut file).finish(&mut df.clone())?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_identical_lineages() {
+        let input = vec![
+            "d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Shewanellaceae;g__Shewanella;s__Shewanella baltica".to_string(),
+            "d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Shewanellaceae;g__Shewanella;s__Shewanella baltica".to_string(),
+        ];
+        let (lca, rank) = compute_lca_strs(&input);
+        assert_eq!(lca, input[0]);
+        assert_eq!(rank, Some("species"));
+    }
+
+    #[test]
+    fn test_partial_lca() {
+        let input = vec![
+            "d__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Bacteroidaceae;g__Phocaeicola;s__Phocaeicola vulgatus".to_string(),
+            "d__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Bacteroidaceae;g__Prevotella;s__Prevotella copri_B".to_string(),
+        ];
+        let (lca, rank) = compute_lca_strs(&input);
+        assert_eq!(
+            lca,
+            "d__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Bacteroidaceae"
+        );
+        assert_eq!(rank, Some("family"));
+    }
+
+    #[test]
+    fn test_no_common_lca() {
+        let input = vec![
+            "d__Bacteria;p__Firmicutes".to_string(),
+            "d__Archaea;p__Euryarchaeota".to_string(),
+        ];
+        let (lca, rank) = compute_lca_strs(&input);
+        assert_eq!(lca, "");
+        assert_eq!(rank, None);
+    }
+
+    #[test]
+    fn test_single_entry() {
+        let input = vec!["d__Bacteria;p__Firmicutes;c__Bacilli".to_string()];
+        let (lca, rank) = compute_lca_strs(&input);
+        assert_eq!(lca, input[0]);
+        assert_eq!(rank, Some("class"));
+    }
+
+    #[test]
+    fn test_empty_input() {
+        let input: Vec<String> = vec![];
+        let (lca, rank) = compute_lca_strs(&input);
+        assert_eq!(lca, "");
+        assert_eq!(rank, None);
+    }
 }

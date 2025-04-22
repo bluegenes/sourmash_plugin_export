@@ -66,15 +66,24 @@ def test_toparquet_test6(runtmp, capfd):
 
     assert os.path.exists(out_parquet), f"Expected output file at {out_parquet}."
 
-    # Optionally verify content with Polars
+    # verify content with Polars
     df = pl.read_parquet(out_parquet)
     # print the first few rows
     print(df.head())
     assert "hash" in df.columns
     assert "dataset_names" in df.columns
-    # assert len(df) == 84
-    # # check first few lines
-    # assert df[0, "hash"] == 2925290528259
-    # print(";".join(df[0, "dataset_names"]))
-    # names0 = df[0, "dataset_names"]
-    # assert ";".join(names0) == "NC_009661.1 Shewanella baltica OS185 plasmid pS18501, complete sequence;NC_011665.1 Shewanella baltica OS223 plasmid pS22303, complete sequence"
+    assert len(df) == 23910
+    # check some lines
+    assert df[0, "hash"] == 15249706293397504
+    print(";".join(df[50, "dataset_names"]))
+    names0 = df[50, "dataset_names"]
+    assert ";".join(names0) == "GCF_000021665.1 Shewanella baltica OS223;GCF_000017325.1 Shewanella baltica OS185"
+    print(";".join(df[50, "taxonomy_list"]))
+    tax_list = df[50, "taxonomy_list"]
+    assert ";".join(tax_list) == "d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Shewanellaceae;g__Shewanella;s__Shewanella baltica;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Shewanellaceae;g__Shewanella;s__Shewanella baltica"
+    print(df[50, "lca_lineage"])
+    lca_lineage = df[50, "lca_lineage"]
+    assert lca_lineage == "d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Shewanellaceae;g__Shewanella;s__Shewanella baltica"
+    print(df[50, "lca_rank"])
+    lca_rank = df[50, "lca_rank"]
+    assert lca_rank == "species"
