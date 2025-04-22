@@ -20,6 +20,35 @@ struct TaxonomyRow {
     species: Option<String>,
 }
 
+fn print_lca_summary(rank_counts: &HashMap<&str, usize>, none_count: usize, total: usize) {
+    eprintln!("--- LCA Summary ---");
+
+    let mut rank_keys: Vec<_> = rank_counts.keys().copied().collect();
+    rank_keys.sort_by_key(|r| match *r {
+        "domain" => 0,
+        "phylum" => 1,
+        "class" => 2,
+        "order" => 3,
+        "family" => 4,
+        "genus" => 5,
+        "species" => 6,
+        _ => 7,
+    });
+
+    for rank in rank_keys {
+        let count = rank_counts[rank];
+        let pct = (count as f64 / total as f64) * 100.0;
+        eprintln!("{rank}: {count} ({pct:.1}%)");
+    }
+
+    if none_count > 0 {
+        let pct = (none_count as f64 / total as f64) * 100.0;
+        eprintln!("unclassified: {none_count} ({pct:.1}%)");
+    }
+    eprintln!("Total hashes: {}", total);
+    eprintln!("-------------------\n");
+}
+
 fn compute_lca_strs(taxonomies: &[String]) -> (String, Option<&'static str>) {
     if taxonomies.is_empty() {
         return (String::new(), None);
@@ -159,11 +188,15 @@ pub fn export_revindex_to_parquet(
         })
         .collect();
 
-    let mut hashes = Vec::with_capacity(results.len());
-    let mut dataset_lists = Vec::with_capacity(results.len());
-    let mut taxonomy_lists = Vec::with_capacity(results.len());
-    let mut lca_lineage = Vec::with_capacity(results.len());
-    let mut lca_rank = Vec::with_capacity(results.len());
+    let n_rows = results.len();
+    let mut hashes = Vec::with_capacity(n_rows);
+    let mut dataset_lists = Vec::with_capacity(n_rows);
+    let mut taxonomy_lists = Vec::with_capacity(n_rows);
+    let mut lca_lineage = Vec::with_capacity(n_rows);
+    let mut lca_rank = Vec::with_capacity(n_rows);
+
+    let mut rank_counts: HashMap<&str, usize> = HashMap::new();
+    let mut none_count = 0;
 
     for (h, d, t, l, r) in results {
         hashes.push(h);
@@ -171,6 +204,11 @@ pub fn export_revindex_to_parquet(
         taxonomy_lists.push(Some(t));
         lca_lineage.push(l);
         lca_rank.push(r);
+
+        match r {
+            Some(rank) => *rank_counts.entry(rank).or_insert(0) += 1,
+            None => none_count += 1,
+        }
     }
 
     eprintln!("Collected {} hashes. Now making parquet.", hashes.len());
@@ -204,6 +242,11 @@ pub fn export_revindex_to_parquet(
 
     let mut file = std::fs::File::create(out_path)?;
     ParquetWriter::new(&mut file).finish(&mut df.clone())?;
+
+    eprintln!("Exported to '{}'\n", out_path);
+    if tax_path.is_some() {
+        print_lca_summary(&rank_counts, none_count, n_rows);
+    }
 
     Ok(())
 }
