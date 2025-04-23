@@ -53,7 +53,35 @@ def test_toparquet_simple(runtmp, capfd):
     assert ";".join(names0) == "NC_009661.1 Shewanella baltica OS185 plasmid pS18501, complete sequence;NC_011665.1 Shewanella baltica OS223 plasmid pS22303, complete sequence"
 
 
-def test_toparquet_test6(runtmp, capfd):
+def test_toparquet_test6_no_taxonomy(runtmp, capfd):
+    revindex = get_test_data('test6.rocksdb')
+    out_parquet = runtmp.output('test6.parquet')
+
+    runtmp.sourmash('scripts', 'toparquet', revindex, '--output', out_parquet)
+
+    captured = capfd.readouterr()
+    print(captured.out)
+    print(captured.err)
+
+    assert os.path.exists(out_parquet), f"Expected output file at {out_parquet}."
+
+    # verify content with Polars
+    df = pl.read_parquet(out_parquet)
+    # print the first few rows
+    print(df.head())
+    assert "hash" in df.columns
+    assert "dataset_names" in df.columns
+    assert len(df) == 23910
+    # check there are only two columns in the file
+    assert len(df.columns) == 2
+    # check some lines
+    assert df[0, "hash"] == 15249706293397504
+    print(";".join(df[50, "dataset_names"]))
+    names0 = df[50, "dataset_names"]
+    assert ";".join(names0) == "GCF_000021665.1 Shewanella baltica OS223;GCF_000017325.1 Shewanella baltica OS185"
+
+
+def test_toparquet_test6_with_taxonomy(runtmp, capfd):
     revindex = get_test_data('test6.rocksdb')
     tax_csv = get_test_data('test6.taxonomy.csv')
     out_parquet = runtmp.output('test6.parquet')
