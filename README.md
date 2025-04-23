@@ -44,8 +44,8 @@ The command takes the following arguments:
 Now run the `toparquet` command:
 ```
 sourmash scripts toparquet \
-    --db /path/to/rocksdb \
-    --out /path/to/output.parquet \
+    /path/to/rocksdb \
+    --output /path/to/output.parquet \
     --taxonomy /path/to/taxonomy.csv
 ```
 
@@ -70,3 +70,23 @@ Example parquet file:
 | 6979370520679168  | ["GCF_000017325.1 Shewanella b…"] | ["d__Bacteria;p__Proteobacteri…"] | d__Bacteria;p__Proteobacteria;…   | species  |
 | 3223165789803264  | ["GCF_000021665.1 Shewanella b…"] | ["d__Bacteria;p__Proteobacteri…"] | d__Bacteria;p__Proteobacteria;…   | species  |
 
+
+## Full Usage
+
+```
+usage:  toparquet [-h] [-q] [-d] [-o OUTPUT] [-t TAXONOMY] [-c CORES] database
+
+export sourmash signatures (currently revindex only) to parquet
+
+positional arguments:
+  database              A sourmash sketch database (currently revindex only).
+
+options:
+  -h, --help            show this help message and exit
+  -q, --quiet           suppress non-error output
+  -d, --debug           provide debugging output
+  -o, --output OUTPUT   Output file name (parquet).
+  -t, --taxonomy, --lineages TAXONOMY
+                        Taxonomy CSV file (optional).
+  -c, --cores CORES     Number of cores to use (default is all available).
+  ```
