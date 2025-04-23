@@ -59,11 +59,15 @@ class ToParquet(CommandLinePlugin):
             help="A sourmash sketch database (currently revindex only).",
         )
         p.add_argument(
+            "-o",
             "--output",
             help="Output file name (parquet).",
         )
         p.add_argument(
+            "-t",
             "--taxonomy",
+            "--lineages",
+            default=None,
             help="Taxonomy CSV file (optional).",
         )
         p.add_argument(

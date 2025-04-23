@@ -11,7 +11,10 @@ use std::io::BufReader;
 #[derive(Debug, Deserialize)]
 struct TaxonomyRow {
     ident: String,
+    // allow for both "domain" and "superkingdom" as keys
+    #[serde(alias = "superkingdom")]
     domain: Option<String>,
+
     phylum: Option<String>,
     class: Option<String>,
     order: Option<String>,
