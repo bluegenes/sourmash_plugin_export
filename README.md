@@ -62,19 +62,11 @@ Total hashes: 23910
 ```
 
 Example parquet file:
-┌───────────────────┬──────────────────────┬──────────────────────┬─────────────────────┬──────────┐
-│ hash              ┆ dataset_names        ┆ taxonomy_list        ┆ lca_lineage         ┆ lca_rank │
-│ ---               ┆ ---                  ┆ ---                  ┆ ---                 ┆ ---      │
-│ u64               ┆ list[str]            ┆ list[str]            ┆ str                 ┆ str      │
-╞═══════════════════╪══════════════════════╪══════════════════════╪═════════════════════╪══════════╡
-│ 15249706293397504 ┆ ["GCF_000021665.1    ┆ ["d__Bacteria;p__Pro ┆ d__Bacteria;p__Prot ┆ species  │
-│                   ┆ Shewanella b…        ┆ teobacteri…          ┆ eobacteria;…        ┆          │
-│ 18361245509159168 ┆ ["GCF_000017325.1    ┆ ["d__Bacteria;p__Pro ┆ d__Bacteria;p__Prot ┆ species  │
-│                   ┆ Shewanella b…        ┆ teobacteri…          ┆ eobacteria;…        ┆          │
-│ 584608245878528   ┆ ["GCF_000021665.1    ┆ ["d__Bacteria;p__Pro ┆ d__Bacteria;p__Prot ┆ species  │
-│                   ┆ Shewanella b…        ┆ teobacteri…          ┆ eobacteria;…        ┆          │
-│ 6979370520679168  ┆ ["GCF_000017325.1    ┆ ["d__Bacteria;p__Pro ┆ d__Bacteria;p__Prot ┆ species  │
-│                   ┆ Shewanella b…        ┆ teobacteri…          ┆ eobacteria;…        ┆          │
-│ 3223165789803264  ┆ ["GCF_000021665.1    ┆ ["d__Bacteria;p__Pro ┆ d__Bacteria;p__Prot ┆ species  │
-│                   ┆ Shewanella b…        ┆ teobacteri…          ┆ eobacteria;…        ┆          │
-└───────────────────┴──────────────────────┴──────────────────────┴─────────────────────┴──────────┘
+| hash              | dataset_names                     | taxonomy_list                      | lca_lineage                        | lca_rank |
+|------------------|------------------------------------|------------------------------------|------------------------------------|----------|
+| 15249706293397504 | ["GCF_000021665.1 Shewanella b…"] | ["d__Bacteria;p__Proteobacteri…"] | d__Bacteria;p__Proteobacteria;…   | species  |
+| 18361245509159168 | ["GCF_000017325.1 Shewanella b…"] | ["d__Bacteria;p__Proteobacteri…"] | d__Bacteria;p__Proteobacteria;…   | species  |
+| 584608245878528   | ["GCF_000021665.1 Shewanella b…"] | ["d__Bacteria;p__Proteobacteri…"] | d__Bacteria;p__Proteobacteria;…   | species  |
+| 6979370520679168  | ["GCF_000017325.1 Shewanella b…"] | ["d__Bacteria;p__Proteobacteri…"] | d__Bacteria;p__Proteobacteria;…   | species  |
+| 3223165789803264  | ["GCF_000021665.1 Shewanella b…"] | ["d__Bacteria;p__Proteobacteri…"] | d__Bacteria;p__Proteobacteria;…   | species  |
+
