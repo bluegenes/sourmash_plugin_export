@@ -80,7 +80,7 @@ class ToParquet(CommandLinePlugin):
 
     def main(self, args):
         print_version()
-        
+
         num_threads = set_thread_pool(args.cores)
 
         notify(

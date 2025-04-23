@@ -110,6 +110,13 @@ fn load_taxonomy_map(path: &Utf8Path) -> Result<HashMap<String, String>> {
         tax_map.insert(row.ident, taxonomy);
     }
 
+    if tax_map.is_empty() {
+        anyhow::bail!(
+            "Provided taxonomy file '{}' is empty or failed to parse.",
+            path
+        );
+    }
+
     Ok(tax_map)
 }
 
