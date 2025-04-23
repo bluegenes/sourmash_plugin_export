@@ -31,7 +31,8 @@ conda activate sourmash_plugin_export
 
 Install the plugin:
 ```
-pip install .
+make all
+make install
 ```
 
 ## Running the command
