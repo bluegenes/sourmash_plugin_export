@@ -55,7 +55,8 @@ class ToParquet(CommandLinePlugin):
         super().__init__(p)
         p.add_argument(
             "database",
-            help="A sourmash sketch database (currently revindex only).",
+            nargs="+",  # allow one or more databases
+            help="One or more sourmash sketch databases (revindex format only).",
         )
         p.add_argument(
             "-o",
@@ -66,9 +67,16 @@ class ToParquet(CommandLinePlugin):
             "-t",
             "--taxonomy",
             "--lineages",
-            default=None,
-            help="Taxonomy CSV file (optional).",
+            nargs="*",
+            default=[],
+            help="One or more taxonomy CSV files (optional).",
         )
+        p.add_argument(
+            '--lca-info',
+            help='Output an LCA summary to this CSV file.',
+            default=None,
+            type=str,
+        )   
         p.add_argument(
             "-c",
             "--cores",
@@ -95,6 +103,7 @@ class ToParquet(CommandLinePlugin):
             args.database,
             args.output,
             args.taxonomy,
+            args.lca_info,
             False,
         )
 

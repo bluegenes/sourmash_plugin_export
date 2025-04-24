@@ -10,6 +10,10 @@ import polars as pl
 import sourmash_tst_utils as utils
 from sourmash_tst_utils import SourmashCommandFailed
 
+# helper function to flatten nested lists
+def flatten_if_nested(v):
+    return v[0] if isinstance(v, list) and len(v) == 1 and isinstance(v[0], list) else v
+
 
 def get_test_data(filename):
     thisdir = os.path.dirname(__file__)
@@ -71,8 +75,8 @@ def test_rocksdb_toparquet_test6_no_taxonomy(runtmp, capfd):
     assert "hash" in df.columns
     assert "dataset_names" in df.columns
     assert len(df) == 23910
-    # check there are only two columns in the file
-    assert len(df.columns) == 2
+    # check that all columns are present 
+    assert len(df.columns) == 8
     # check some lines
     assert df[0, "hash"] == 15249706293397504
     print(";".join(df[50, "dataset_names"]))
@@ -273,3 +277,73 @@ def test_rocksdb_toparquet_test6_empty_tax_file(runtmp, capfd):
     print(captured.err)
 
     assert f"Error: Provided taxonomy file '{tax_csv}' is empty or failed to parse."
+
+
+def test_rocksdb_toparquet_test6_multiple_revindex(runtmp, capfd):
+    revindex1 = get_test_data("test6.rocksdb")
+    revindex2 = get_test_data("podar-ref-subset.branch0_9_13.internal.rocksdb")
+    tax_csv = get_test_data("test6.taxonomy.csv")
+    out_parquet = runtmp.output("test6.parquet")
+
+    runtmp.sourmash(
+        "scripts", "toparquet", revindex1, revindex2, "--output", out_parquet, "--taxonomy", tax_csv
+    )
+
+    captured = capfd.readouterr()
+    print(captured.out)
+    print(captured.err)
+
+    assert os.path.exists(out_parquet), f"Expected output file at {out_parquet}."
+
+    # verify content with Polars
+    df = pl.read_parquet(out_parquet)
+    # print the first few rows
+    print(df.head())
+    assert "hash" in df.columns
+    assert "dataset_names" in df.columns
+    assert len(df.columns) == 8
+    assert len(df) == 23994
+    # check some hashes
+    target_hash_1 = 15249706293397504
+    expected_names_1 = {
+        "GCF_000021665.1 Shewanella baltica OS223",
+        "GCF_000017325.1 Shewanella baltica OS185",
+    }
+    expected_tax_1 = (
+        "d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;"
+        "o__Enterobacterales;f__Shewanellaceae;g__Shewanella;"
+        "s__Shewanella baltica;" * 2
+    ).rstrip(";")
+    expected_lca_lineage_1 = (
+        "d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;"
+        "o__Enterobacterales;f__Shewanellaceae;g__Shewanella;"
+        "s__Shewanella baltica"
+    )
+
+    target_hash_2 = 2925290528259
+    expected_names_2 = {
+        "NC_009661.1 Shewanella baltica OS185 plasmid pS18501, complete sequence",
+        "NC_011665.1 Shewanella baltica OS223 plasmid pS22303, complete sequence"
+    }
+
+    found_1 = False
+    found_2 = False
+
+    for row in df.iter_rows(named=True):
+        if row["hash"] == target_hash_1:
+            print(row)
+            found_1 = True
+            assert set(row["dataset_names"]) == expected_names_1
+            assert ";".join(row["taxonomy_list"]) == expected_tax_1
+            assert row["lca_lineage"] == expected_lca_lineage_1
+            assert row["lca_rank"] == "species"
+        elif row["hash"] == target_hash_2:
+            print(row)
+            found_2 = True
+            assert set(row["dataset_names"]) == expected_names_2
+            assert not row["taxonomy_list"], "Expected taxonomy_list to be empty or None"
+            assert row["lca_lineage"] in (None, ""), "Expected no lca_lineage"
+            assert row["lca_rank"] in (None, ""), "Expected no lca_rank"
+
+    assert found_1, f"Did not find row with hash {target_hash_1}"
+    assert found_2, f"Did not find row with hash {target_hash_2}"
