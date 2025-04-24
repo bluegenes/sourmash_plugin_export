@@ -79,8 +79,10 @@ def test_rocksdb_toparquet_test6_no_taxonomy(runtmp, capfd):
     assert len(df.columns) == 8
     # check some lines
     assert df[0, "hash"] == 15249706293397504
+    assert df[50, "hash"] == 8357480319128064
     print(";".join(df[50, "dataset_names"]))
     names0 = df[50, "dataset_names"]
+    print(names0)
     assert (
         ";".join(names0)
         == "GCF_000021665.1 Shewanella baltica OS223;GCF_000017325.1 Shewanella baltica OS185"
@@ -304,7 +306,7 @@ def test_rocksdb_toparquet_test6_multiple_revindex(runtmp, capfd):
     assert len(df.columns) == 8
     assert len(df) == 23994
     # check some hashes
-    target_hash_1 = 15249706293397504
+    target_hash_1 = 8357480319128064
     expected_names_1 = {
         "GCF_000021665.1 Shewanella baltica OS223",
         "GCF_000017325.1 Shewanella baltica OS185",
