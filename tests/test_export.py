@@ -362,14 +362,14 @@ def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
         elif row["hash"] == target_hash_2:
             print(row)
             # this hash is actually found in both revindexes
-            if row["source_file"] == "podar-ref-subset.branch0_9_13.internal.rocksdb":
+            if row["source"] == "podar-ref-subset.branch0_9_13.internal.rocksdb":
                 found_2 = True
                 assert set(row["dataset_names"]) == expected_names_2
                 assert not row["taxonomy_list"], "Expected taxonomy_list to be empty or None"
                 assert row["lca_lineage"] in (None, ""), "Expected no lca_lineage"
                 assert row["lca_rank"] in (None, ""), "Expected no lca_rank"
                 assert row["scaled"] == 100000
-            elif row["source_file"] == "test6.rocksdb":
+            elif row["source"] == "test6.rocksdb":
                 found_3 = True
                 assert set(row["dataset_names"]) == expected_names_1
                 assert row["scaled"] == 1000

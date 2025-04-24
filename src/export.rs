@@ -31,7 +31,7 @@ struct ArrowRecord {
     lca_rank: Option<String>,
     ksize: u32,
     scaled: u32,
-    source_file: String, // basename of revindex
+    source: String, // basename of revindex
 }
 
 // schema for parquet file
@@ -52,7 +52,7 @@ fn create_schema() -> Schema {
         Field::new("lca_rank", DataType::Utf8, true),
         Field::new("ksize", DataType::UInt32, false),
         Field::new("scaled", DataType::UInt32, false),
-        Field::new("source_file", DataType::Utf8, false),
+        Field::new("source", DataType::Utf8, false),
     ])
 }
 
@@ -80,10 +80,10 @@ fn convert_to_batch(records: &[ArrowRecord]) -> ArrowResult<(Schema, Chunk<Box<d
     let hashes = UInt64Array::from_slice(&records.iter().map(|r| r.hash).collect::<Vec<_>>());
     let ksizes = UInt32Array::from_slice(&records.iter().map(|r| r.ksize).collect::<Vec<_>>());
     let scaleds = UInt32Array::from_slice(&records.iter().map(|r| r.scaled).collect::<Vec<_>>());
-    let source_file = Utf8Array::<i32>::from_slice(
+    let source = Utf8Array::<i32>::from_slice(
         &records
             .iter()
-            .map(|r| r.source_file.as_str())
+            .map(|r| r.source.as_str())
             .collect::<Vec<_>>(),
     );
 
@@ -120,7 +120,7 @@ fn convert_to_batch(records: &[ArrowRecord]) -> ArrowResult<(Schema, Chunk<Box<d
         Box::new(lca_rank) as Box<dyn Array>,
         Box::new(ksizes) as Box<dyn Array>,
         Box::new(scaleds) as Box<dyn Array>,
-        Box::new(source_file) as Box<dyn Array>,
+        Box::new(source) as Box<dyn Array>,
     ]);
 
     Ok((create_schema(), chunk))
@@ -502,7 +502,7 @@ fn process_revindex(
             lca_rank,
             ksize,
             scaled: *scaled,
-            source_file: db_basename.clone(),
+            source: db_basename.clone(),
         };
 
         sender.send(record)?;

@@ -64,7 +64,7 @@ Total hashes: 23910
 ```
 
 Example parquet file:
-| hash           | dataset_names                                            | taxonomy_list                                           | lca_lineage                                             | lca_rank | ksize | scaled | source_file    |
+| hash           | dataset_names                                            | taxonomy_list                                           | lca_lineage                                             | lca_rank | ksize | scaled | source    |
 |----------------|----------------------------------------------------------|----------------------------------------------------------|----------------------------------------------------------|----------|--------|--------|----------------|
 | 15249706293397504 | ["GCF_000021665.1 Shewanella baltica OS223"]         | ["d__Bacteria;p__Proteobacteria;..."]                   | d__Bacteria;p__Proteobacteria;...                       | species  | 31     | 1000   | test6.rocksdb  |
 | 18361245509159168 | ["GCF_000017325.1 Shewanella baltica OS185"]         | ["d__Bacteria;p__Proteobacteria;..."]                   | d__Bacteria;p__Proteobacteria;...                       | species  | 31     | 1000   | test6.rocksdb  |
@@ -81,7 +81,7 @@ df
 ```
 ## Limitations
 
-**If you input more than one RocksDB database, any hashes present in multiple databases will be show up more than once in the output, once for each `source_file` they are found in. The LCA summaries will treat these hashes as unique. If you'd like to summarize across LCA across these databases, you can use pandas or polars to group by the `hash` column and summarize the LCA information yourself.**
+**If you input more than one RocksDB database, any hashes present in multiple databases will be show up more than once in the output, once for each `source` they are found in. The LCA summaries will treat these hashes as unique. If you'd like to merge information from duplicated hashes while summarizing LCA across these databases, you can use pandas or polars to group by the `hash` column and summarize the LCA information yourself.**
 
 ## Full Usage
 
