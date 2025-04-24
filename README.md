@@ -81,7 +81,7 @@ df
 ```
 ## Limitations
 
-**If you input more than one RocksDB database, any hashes present in multiple databases will be show up more than once in the output, once for each `source` they are found in. The LCA summaries will treat these hashes as unique. If you'd like to merge information from duplicated hashes while summarizing LCA across these databases, you can use pandas or polars to group by the `hash` column and summarize the LCA information yourself.**
+**If you input more than one RocksDB database, any hashes present in multiple databases will be show up more than once in the output, once for each `source` they are found in. The LCA summaries will treat these hashes as unique.To merge information from duplicated hashes while summarizing LCA across these databases, you can use the script at `src/python/merge-duplicated-hashes.py` to build a parquet file with merged information for any duplicates.**
 
 ## Full Usage
 
@@ -103,3 +103,20 @@ options:
   --lca-info LCA_INFO   Output an LCA summary to this CSV file.
   -c, --cores CORES     Number of cores to use (default is all available).
   ```
+
+
+## Add-ons
+
+Two additional scripts are included in the `src/python` directory:
+- `merge-duplicated-hashes.py` - Merge duplicated hashes in a parquet file and output a new parquet file with merged information.
+- `plot-lca.py` - Plot the LCA summary information from the parquet file.
+
+These are not integrated into the main commands yet, but can be run separately. To run them, you can use the following commands:
+```
+python src/python/merge-duplicated-hashes.py test6.parquet -o merged_test6.parquet
+```
+This will merge any duplicated hashes in the `test6.parquet` file and output a new file called `merged_test6.parquet`. You can then use this file to plot the LCA summary information:
+```
+python src/python/plot-lca.py merged_test6.parquet --save merged_test6_lca.png
+```
+This will create a plot of the LCA summary information for the merged file. The plot can be saved as a png, svg, or pdf file.
