@@ -1,6 +1,5 @@
 #! /usr/bin/env python
 import os
-import sys
 from sourmash.logging import notify
 from sourmash.plugins import CommandLinePlugin
 import importlib.metadata

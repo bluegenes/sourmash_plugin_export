@@ -2,6 +2,7 @@
 *.txt
 *.sig
 *.sig.gz
+*.parquet
 
 /target
 

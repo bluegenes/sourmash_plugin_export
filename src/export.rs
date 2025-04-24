@@ -23,6 +23,15 @@ struct TaxonomyRow {
     species: Option<String>,
 }
 
+#[derive(Debug)]
+struct HashInfo {
+    hash: u64,
+    dataset_names: Vec<String>,
+    taxonomy_list: Option<Vec<String>>,
+    lca_lineage: Option<String>,
+    lca_rank: Option<&'static str>,
+}
+
 fn print_lca_summary(rank_counts: &HashMap<&str, usize>, none_count: usize, total: usize) {
     eprintln!("--- LCA Summary ---");
 
@@ -68,14 +77,13 @@ fn compute_lca_strs(taxonomies: &[String]) -> (String, Option<&'static str>) {
     let mut lca = Vec::new();
     let mut lca_rank = None;
 
-    for i in 0..first.len() {
-        let val = first[i];
+    for (i, val) in first.iter().enumerate() {
         if split_taxonomies
             .iter()
-            .all(|parts| parts.get(i) == Some(&val))
+            .all(|parts| parts.get(i) == Some(val))
         {
-            lca.push(val);
-            lca_rank = rank_names.get(i).copied(); // update LCA rank name
+            lca.push(*val);
+            lca_rank = rank_names.get(i).copied();
         } else {
             break;
         }
@@ -139,23 +147,13 @@ pub fn export_revindex_to_parquet(
 
     let taxonomy_enabled = tax_map.is_some();
 
-    let revindex = match revindex {
-        RevIndex::Plain(db) => db,
-        // optionally handle other variants
-        _ => anyhow::bail!("Expected RocksDB-based RevIndex (Plain)"),
-    };
+    let RevIndex::Plain(revindex) = revindex;
     eprintln!("DB opened");
     let db = &revindex.db;
     let cf = db.cf_handle("hashes").expect("Missing 'hashes' CF");
 
     // collect hash + dataset name list
-    let results: Vec<(
-        u64,
-        Vec<String>,
-        Option<Vec<String>>,
-        Option<String>,
-        Option<&'static str>,
-    )> = db
+    let results: Vec<HashInfo> = db
         .iterator_cf(&cf, rocksdb::IteratorMode::Start)
         .filter_map(|res| res.ok())
         .filter_map(|(k, v)| {
@@ -198,15 +196,21 @@ pub fn export_revindex_to_parquet(
                     .cloned()
                     .collect();
                 let (lca_lineage, lca_rank) = compute_lca_strs(&taxonomy_list);
-                Some((
+                Some(HashInfo {
                     hash,
                     dataset_names,
-                    Some(taxonomy_list),
-                    Some(lca_lineage),
+                    taxonomy_list: Some(taxonomy_list),
+                    lca_lineage: Some(lca_lineage),
                     lca_rank,
-                ))
+                })
             } else {
-                Some((hash, dataset_names, None, None, None))
+                Some(HashInfo {
+                    hash,
+                    dataset_names,
+                    taxonomy_list: None,
+                    lca_lineage: None,
+                    lca_rank: None,
+                })
             }
         })
         .collect();
@@ -229,17 +233,19 @@ pub fn export_revindex_to_parquet(
     let mut rank_counts: HashMap<&str, usize> = HashMap::new();
     let mut none_count = 0;
 
-    for (h, d, tax, lin, rank) in results {
-        hashes.push(h);
-        dataset_lists.push(Some(d));
+    for result in results {
+        hashes.push(result.hash);
+        dataset_lists.push(Some(result.dataset_names));
 
         if taxonomy_enabled {
-            taxonomy_lists.as_mut().unwrap().push(tax);
-            lca_lineages.as_mut().unwrap().push(lin.unwrap_or_default());
-            lca_ranks.as_mut().unwrap().push(rank);
+            taxonomy_lists.as_mut().unwrap().push(result.taxonomy_list);
+            lca_lineages
+                .as_mut()
+                .unwrap()
+                .push(result.lca_lineage.unwrap_or_default());
+            lca_ranks.as_mut().unwrap().push(result.lca_rank);
 
-            match rank {
-                // Some(r) => *rank_counts.entry(r).or_insert(0) += 1,
+            match result.lca_rank {
                 Some(r) => *rank_counts.entry(r).or_insert(0) += 1,
                 None => none_count += 1,
             }

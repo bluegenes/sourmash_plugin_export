@@ -9,6 +9,8 @@ dependencies:
   - rust==1.81
   - maturin>=1,<2
   - pytest
+  - ruff
   - pandas
+  - pyarrow
   - polars
   - compilers

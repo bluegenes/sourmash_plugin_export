@@ -50,7 +50,13 @@ sourmash scripts toparquet \
     --taxonomy /path/to/taxonomy.csv
 ```
 
-The output will be a parquet file containing the mapping of hashes in the sourmash sketches to the list of datasets they are found in. If taxonomy information is provided, we will also print the list of taxonomies the hash is found in, plus an LCA of those taxonomic lineages, if one exists. LCA summary information will be printed to the console. The output parquet file can be opened in any tool that supports parquet format, such as pandas or pyarrow.
+## Example from the test data
+To run on the test data included in this repository, you can use the following command from inside the main `sourmash_plugin_export` directory:
+```
+sourmash scripts toparquet tests/test-data/test6.rocksdb --output test6.parquet --taxonomy tests/test-data/test6.taxonomy.csv
+```
+
+The output will be a parquet file containing the mapping of hashes in the sourmash sketches to the list of datasets they are found in. If taxonomy information is provided, we will also print an LCA summary to the console and store the taxonomy list and LCA information for each hash in the parquet file (if an LCA exists). The output parquet file can be opened in any tool that supports parquet format, such as pandas with pyarrow.
 
 Example LCA Summary:
 ```
@@ -71,6 +77,14 @@ Example parquet file:
 | 6979370520679168  | ["GCF_000017325.1 Shewanella b…"] | ["d__Bacteria;p__Proteobacteri…"] | d__Bacteria;p__Proteobacteria;…   | species  |
 | 3223165789803264  | ["GCF_000021665.1 Shewanella b…"] | ["d__Bacteria;p__Proteobacteri…"] | d__Bacteria;p__Proteobacteria;…   | species  |
 
+
+
+To look at the output in pandas afterwards, make sure you're in the `sourmash_plugin_export` conda environment or have installed pandas and pyarrow in your current environment. Then you can open python or a jupyter notebook and run the following code to read the parquet file:
+```
+import pandas as pd
+df = pd.read_parquet('test6.parquet')
+df
+```
 
 ## Full Usage
 

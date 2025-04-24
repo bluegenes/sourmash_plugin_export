@@ -5,14 +5,8 @@ Tests for export
 import os
 import csv
 import pytest
-import signal
-import subprocess
-import time
 import polars as pl
 
-import sourmash
-from sourmash import sourmash_args
-from sourmash.signature import load_one_signature_from_json
 import sourmash_tst_utils as utils
 from sourmash_tst_utils import SourmashCommandFailed
 
