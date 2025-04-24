@@ -301,13 +301,13 @@ pub fn write_lca_info(
 
     // always print individual summaries
     for (source, summary) in all_summaries {
-        eprintln!("LCA summary for {source}:");
+        eprintln!("{source}:");
         eprintln!("{summary}");
     }
 
     // only print merged summary if >1 input
     if all_summaries.len() > 1 {
-        eprintln!("Merged LCA summary:");
+        eprintln!("Combined LCA summary:");
         eprintln!("{combined_summary}");
     }
 

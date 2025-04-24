@@ -6,6 +6,7 @@ import os
 import csv
 import pytest
 import polars as pl
+import pandas as pd
 
 import sourmash_tst_utils as utils
 from sourmash_tst_utils import SourmashCommandFailed
@@ -88,9 +89,10 @@ def test_rocksdb_revindex_to_parquet_test6_with_taxonomy(runtmp, capfd):
     revindex = get_test_data("test6.rocksdb")
     tax_csv = get_test_data("test6.taxonomy.csv")
     out_parquet = runtmp.output("test6.parquet")
+    out_lca = runtmp.output("test6.lca.csv")
 
     runtmp.sourmash(
-        "scripts", "revindex_to_parquet", revindex, "--output", out_parquet, "--taxonomy", tax_csv
+        "scripts", "revindex_to_parquet", revindex, "--output", out_parquet, "--taxonomy", tax_csv, "--lca-info", out_lca
     )
 
     captured = capfd.readouterr()
@@ -129,6 +131,27 @@ def test_rocksdb_revindex_to_parquet_test6_with_taxonomy(runtmp, capfd):
     print(df[50, "lca_rank"])
     lca_rank = df[50, "lca_rank"]
     assert lca_rank == "species"
+
+    # check that the lca file was created
+    assert os.path.exists(out_lca), f"Expected output file at {out_lca}."
+    # check that the lca file contains the expected columns
+    lca_df = pd.read_csv(out_lca)
+    print(lca_df)
+    expected_rows = [
+        {"source": "test6.rocksdb", "rank": "family", "count": 8, "percent": 0.03},
+        {"source": "test6.rocksdb", "rank": "species", "count": 23901, "percent": 99.96},
+        {"source": "test6.rocksdb", "rank": "order", "count": 1, "percent": 0.00},
+        {"source": "combined", "rank": "family", "count": 8, "percent": 0.03},
+        {"source": "combined", "rank": "order", "count": 1, "percent": 0.00},
+        {"source": "combined", "rank": "species", "count": 23901, "percent": 99.96},
+    ]
+
+    for expected_row in expected_rows:
+        assert any(
+            all(row[k] == expected_row[k] for k in expected_row)
+            for row in lca_df.to_dict(orient="records")
+        ), f"Expected row not found: {expected_row}"
+
 
 
 def test_rocksdb_revindex_to_parquet_test6_with_taxonomy_superkindom(runtmp, capfd):
@@ -281,9 +304,10 @@ def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
     revindex2 = get_test_data("podar-ref-subset.branch0_9_13.internal.rocksdb")
     tax_csv = get_test_data("test6.taxonomy.csv")
     out_parquet = runtmp.output("test6.parquet")
+    lca_csv = runtmp.output("test6.lca.csv")
 
     runtmp.sourmash(
-        "scripts", "revindex_to_parquet", revindex1, revindex2, "--output", out_parquet, "--taxonomy", tax_csv
+        "scripts", "revindex_to_parquet", revindex1, revindex2, "--output", out_parquet, "--taxonomy", tax_csv, "--lca-info", lca_csv
     )
 
     captured = capfd.readouterr()
@@ -354,3 +378,24 @@ def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
     assert found_1, f"Did not find a row with hash {target_hash_1}"
     assert found_2, f"Did not find a row with hash {target_hash_2} in podar-ref-subset.branch0_9_13.internal.rocksdb"
     assert found_3, f"Did not find a row with hash {target_hash_2} in test6.rocksdb"
+
+    # check that the lca file was created
+    assert os.path.exists(lca_csv), f"Expected output file at {lca_csv}."
+    # check that the lca file contains the expected columns
+    lca_df = pd.read_csv(lca_csv)
+    print(lca_df)
+    expected_rows = [
+        {"source": "test6.rocksdb", "rank": "family", "count": 8, "percent": 0.03},
+        {"source": "test6.rocksdb", "rank": "species", "count": 23901, "percent": 99.96},
+        {"source": "test6.rocksdb", "rank": "order", "count": 1, "percent": 0.00},
+        {"source": "podar-ref-subset.branch0_9_13.internal.rocksdb", "rank": "unclassified", "count": 84, "percent": 100.00},
+        {"source": "combined", "rank": "family", "count": 8, "percent": 0.03},
+        {"source": "combined", "rank": "order", "count": 1, "percent": 0.00},
+        {"source": "combined", "rank": "species", "count": 23901, "percent": 99.61},
+        {"source": "combined", "rank": "unclassified", "count": 84, "percent": 0.35},
+    ]
+    for expected_row in expected_rows:
+        assert any(
+            all(row[k] == expected_row[k] for k in expected_row)
+            for row in lca_df.to_dict(orient="records")
+        ), f"Expected row not found: {expected_row}"
