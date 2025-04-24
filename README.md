@@ -38,20 +38,13 @@ make install
 ## Running the command
 The `revindex_to_parquet` command is used to export a sourmash signature database to parquet format. It can also include taxonomic information if available.
 You must provide:
+
 - one or more RocksDB databases to export
 - an output path for the parquet file (`--output`)
 - (optional) One or more taxonomy CSV files mapping genome identifiers to taxonomic lineages (currently only NCBI and GTDB taxonomies are supported; `--taxonomy`/`--lineages`)
 - (optional) A CSV file to output LCA summary information (`--lca-info`)
 
-Now run the `revindex_to_parquet` command:
-```
-sourmash scripts revindex_to_parquet \
-    /path/to/rocksdb \
-    --output /path/to/output.parquet \
-    --taxonomy /path/to/taxonomy.csv
-```
-
-## Example from the test data
+### Example from the test data
 To run on the test data included in this repository, you can use the following command from inside the main `sourmash_plugin_export` directory:
 ```
 sourmash scripts revindex_to_parquet tests/test-data/test6.rocksdb --output test6.parquet --taxonomy tests/test-data/test6.taxonomy.csv
@@ -86,8 +79,9 @@ import pandas as pd
 df = pd.read_parquet('test6.parquet')
 df
 ```
+## Limitations
 
-If you input more than one RocksDB database, any hashes present in multiple databases will be show up more than once in the output. You can use the `source_file` column to identify which database each hash came from.
+**If you input more than one RocksDB database, any hashes present in multiple databases will be show up more than once in the output, once for each `source_file` they are found in. The LCA summaries will treat these hashes as unique. If you'd like to summarize across LCA across these databases, you can use pandas or polars to group by the `hash` column and summarize the LCA information yourself.**
 
 ## Full Usage
 
