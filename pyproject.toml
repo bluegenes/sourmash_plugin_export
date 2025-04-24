@@ -20,7 +20,7 @@ requires = ["maturin>=1.4.0,<2"]
 build-backend = "maturin"
 
 [project.entry-points."sourmash.cli_script"]
-toparquet = "sourmash_plugin_export:ToParquet"
+revindex_to_parquet = "sourmash_plugin_export:RevIndexToParquet"
 
 [project.optional-dependencies]
 test = [

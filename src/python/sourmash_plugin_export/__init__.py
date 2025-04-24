@@ -47,9 +47,9 @@ def non_negative_int(value):
     return ivalue
 
 
-class ToParquet(CommandLinePlugin):
-    command = "toparquet"
-    description = "export sourmash signatures (currently revindex only) to parquet"
+class RevIndexToParquet(CommandLinePlugin):
+    command = "revindex_to_parquet"
+    description = "export sourmash revindex to parquet, optionally summarizing taxonomic information"
 
     def __init__(self, p):
         super().__init__(p)

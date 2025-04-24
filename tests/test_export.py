@@ -10,11 +10,6 @@ import polars as pl
 import sourmash_tst_utils as utils
 from sourmash_tst_utils import SourmashCommandFailed
 
-# helper function to flatten nested lists
-def flatten_if_nested(v):
-    return v[0] if isinstance(v, list) and len(v) == 1 and isinstance(v[0], list) else v
-
-
 def get_test_data(filename):
     thisdir = os.path.dirname(__file__)
     return os.path.join(thisdir, "test-data", filename)
@@ -22,16 +17,16 @@ def get_test_data(filename):
 
 def test_installed(runtmp):
     with pytest.raises(utils.SourmashCommandFailed):
-        runtmp.sourmash("scripts", "toparquet")
+        runtmp.sourmash("scripts", "revindex_to_parquet")
 
-    assert "usage:  toparquet" in runtmp.last_result.err
+    assert "usage:  revindex_to_parquet" in runtmp.last_result.err
 
 
-def test_rocksdb_toparquet_simple(runtmp, capfd):
+def test_rocksdb_revindex_to_parquet_simple(runtmp, capfd):
     revindex = get_test_data("podar-ref-subset.branch0_9_13.internal.rocksdb")
     out_parquet = runtmp.output("podar-ref-subset.branch0_9_13.internal.parquet")
 
-    runtmp.sourmash("scripts", "toparquet", revindex, "--output", out_parquet)
+    runtmp.sourmash("scripts", "revindex_to_parquet", revindex, "--output", out_parquet)
 
     captured = capfd.readouterr()
     print(captured.out)
@@ -56,11 +51,11 @@ def test_rocksdb_toparquet_simple(runtmp, capfd):
     )
 
 
-def test_rocksdb_toparquet_test6_no_taxonomy(runtmp, capfd):
+def test_rocksdb_revindex_to_parquet_test6_no_taxonomy(runtmp, capfd):
     revindex = get_test_data("test6.rocksdb")
     out_parquet = runtmp.output("test6.parquet")
 
-    runtmp.sourmash("scripts", "toparquet", revindex, "--output", out_parquet)
+    runtmp.sourmash("scripts", "revindex_to_parquet", revindex, "--output", out_parquet)
 
     captured = capfd.readouterr()
     print(captured.out)
@@ -89,13 +84,13 @@ def test_rocksdb_toparquet_test6_no_taxonomy(runtmp, capfd):
     )
 
 
-def test_rocksdb_toparquet_test6_with_taxonomy(runtmp, capfd):
+def test_rocksdb_revindex_to_parquet_test6_with_taxonomy(runtmp, capfd):
     revindex = get_test_data("test6.rocksdb")
     tax_csv = get_test_data("test6.taxonomy.csv")
     out_parquet = runtmp.output("test6.parquet")
 
     runtmp.sourmash(
-        "scripts", "toparquet", revindex, "--output", out_parquet, "--taxonomy", tax_csv
+        "scripts", "revindex_to_parquet", revindex, "--output", out_parquet, "--taxonomy", tax_csv
     )
 
     captured = capfd.readouterr()
@@ -136,7 +131,7 @@ def test_rocksdb_toparquet_test6_with_taxonomy(runtmp, capfd):
     assert lca_rank == "species"
 
 
-def test_rocksdb_toparquet_test6_with_taxonomy_superkindom(runtmp, capfd):
+def test_rocksdb_revindex_to_parquet_test6_with_taxonomy_superkindom(runtmp, capfd):
     # check that superkingdom header can be used in place of domain
     revindex = get_test_data("test6.rocksdb")
     tax_csv = get_test_data("test6.taxonomy.csv")
@@ -157,7 +152,7 @@ def test_rocksdb_toparquet_test6_with_taxonomy_superkindom(runtmp, capfd):
             writer.writerows(updated_rows)
 
     runtmp.sourmash(
-        "scripts", "toparquet", revindex, "--output", out_parquet, "--taxonomy", tax_mod
+        "scripts", "revindex_to_parquet", revindex, "--output", out_parquet, "--taxonomy", tax_mod
     )
 
     print(runtmp.last_result.out)
@@ -201,7 +196,7 @@ def test_rocksdb_toparquet_test6_with_taxonomy_superkindom(runtmp, capfd):
     assert lca_rank == "species"
 
 
-def test_rocksdb_toparquet_test6_bad_tax_file(runtmp, capfd):
+def test_rocksdb_revindex_to_parquet_test6_bad_tax_file(runtmp, capfd):
     revindex = get_test_data("test6.rocksdb")
     tax_csv = get_test_data("test6.gbsketch.csv")
     out_parquet = runtmp.output("test6.parquet")
@@ -209,7 +204,7 @@ def test_rocksdb_toparquet_test6_bad_tax_file(runtmp, capfd):
     with pytest.raises(SourmashCommandFailed):
         runtmp.sourmash(
             "scripts",
-            "toparquet",
+            "revindex_to_parquet",
             revindex,
             "--output",
             out_parquet,
@@ -227,7 +222,7 @@ def test_rocksdb_toparquet_test6_bad_tax_file(runtmp, capfd):
     )
 
 
-def test_rocksdb_toparquet_test6_tax_file_doesnt_exist(runtmp, capfd):
+def test_rocksdb_revindex_to_parquet_test6_tax_file_doesnt_exist(runtmp, capfd):
     revindex = get_test_data("test6.rocksdb")
     tax_csv = runtmp.output("test6.empty.csv")
     out_parquet = runtmp.output("test6.parquet")
@@ -235,7 +230,7 @@ def test_rocksdb_toparquet_test6_tax_file_doesnt_exist(runtmp, capfd):
     with pytest.raises(SourmashCommandFailed):
         runtmp.sourmash(
             "scripts",
-            "toparquet",
+            "revindex_to_parquet",
             revindex,
             "--output",
             out_parquet,
@@ -250,7 +245,7 @@ def test_rocksdb_toparquet_test6_tax_file_doesnt_exist(runtmp, capfd):
     assert "Error: No such file or directory (os error 2)" in captured.err
 
 
-def test_rocksdb_toparquet_test6_empty_tax_file(runtmp, capfd):
+def test_rocksdb_revindex_to_parquet_test6_empty_tax_file(runtmp, capfd):
     revindex = get_test_data("test6.rocksdb")
     tax_csv = runtmp.output("test6.empty.csv")
     out_parquet = runtmp.output("test6.parquet")
@@ -266,7 +261,7 @@ def test_rocksdb_toparquet_test6_empty_tax_file(runtmp, capfd):
     with pytest.raises(SourmashCommandFailed):
         runtmp.sourmash(
             "scripts",
-            "toparquet",
+            "revindex_to_parquet",
             revindex,
             "--output",
             out_parquet,
@@ -281,14 +276,14 @@ def test_rocksdb_toparquet_test6_empty_tax_file(runtmp, capfd):
     assert f"Error: Provided taxonomy file '{tax_csv}' is empty or failed to parse."
 
 
-def test_rocksdb_toparquet_test6_multiple_revindex(runtmp, capfd):
+def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
     revindex1 = get_test_data("test6.rocksdb")
     revindex2 = get_test_data("podar-ref-subset.branch0_9_13.internal.rocksdb")
     tax_csv = get_test_data("test6.taxonomy.csv")
     out_parquet = runtmp.output("test6.parquet")
 
     runtmp.sourmash(
-        "scripts", "toparquet", revindex1, revindex2, "--output", out_parquet, "--taxonomy", tax_csv
+        "scripts", "revindex_to_parquet", revindex1, revindex2, "--output", out_parquet, "--taxonomy", tax_csv
     )
 
     captured = capfd.readouterr()
@@ -330,6 +325,7 @@ def test_rocksdb_toparquet_test6_multiple_revindex(runtmp, capfd):
 
     found_1 = False
     found_2 = False
+    found_3 = False
 
     for row in df.iter_rows(named=True):
         if row["hash"] == target_hash_1:
@@ -341,11 +337,20 @@ def test_rocksdb_toparquet_test6_multiple_revindex(runtmp, capfd):
             assert row["lca_rank"] == "species"
         elif row["hash"] == target_hash_2:
             print(row)
-            found_2 = True
-            assert set(row["dataset_names"]) == expected_names_2
-            assert not row["taxonomy_list"], "Expected taxonomy_list to be empty or None"
-            assert row["lca_lineage"] in (None, ""), "Expected no lca_lineage"
-            assert row["lca_rank"] in (None, ""), "Expected no lca_rank"
+            # this hash is actually found in both revindexes
+            if row["source_file"] == "podar-ref-subset.branch0_9_13.internal.rocksdb":
+                found_2 = True
+                assert set(row["dataset_names"]) == expected_names_2
+                assert not row["taxonomy_list"], "Expected taxonomy_list to be empty or None"
+                assert row["lca_lineage"] in (None, ""), "Expected no lca_lineage"
+                assert row["lca_rank"] in (None, ""), "Expected no lca_rank"
+                assert row["scaled"] == 100000
+            elif row["source_file"] == "test6.rocksdb":
+                found_3 = True
+                assert set(row["dataset_names"]) == expected_names_1
+                assert row["scaled"] == 1000
+                assert ';'.join(row["taxonomy_list"]) == expected_tax_1
 
-    assert found_1, f"Did not find row with hash {target_hash_1}"
-    assert found_2, f"Did not find row with hash {target_hash_2}"
+    assert found_1, f"Did not find a row with hash {target_hash_1}"
+    assert found_2, f"Did not find a row with hash {target_hash_2} in podar-ref-subset.branch0_9_13.internal.rocksdb"
+    assert found_3, f"Did not find a row with hash {target_hash_2} in test6.rocksdb"
