@@ -10,3 +10,10 @@ sys.stdout = sys.stderr
 def runtmp():
     with TempDirectory() as location:
         yield RunnerContext(location)
+
+# Set environment variable PYTEST_RUNNING
+def pytest_configure(config):
+    os.environ["PYTEST_RUNNING"] = "1"
+
+def pytest_unconfigure(config):
+    del os.environ["PYTEST_RUNNING"]

@@ -17,9 +17,23 @@ use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
+
+fn setup_ctrlc_handler(cancel_flag: Arc<AtomicBool>) -> Result<()> {
+    if std::env::var("PYTEST_RUNNING").is_err() {
+        let cancel_flag = cancel_flag.clone();
+        ctrlc::set_handler(move || {
+            eprintln!("Received Ctrl-C! Will terminate after current item...");
+            cancel_flag.store(true, Ordering::SeqCst);
+        })?;
+    } else {
+        eprintln!("Running under pytest, skipping Ctrl-C handler setup.");
+    }
+    Ok(())
+}
 
 // Record struct for parquet file output
 #[derive(Debug)]
@@ -453,6 +467,7 @@ fn process_revindex(
     sender: &Sender<ArrowRecord>,
     taxonomy_map: Option<&HashMap<String, String>>,
     rw: bool,
+    cancel_flag: Arc<AtomicBool>,
 ) -> Result<LCASummary> {
     // get basename of revindex directory for us to write later
     let db_basename = db_path
@@ -484,7 +499,7 @@ fn process_revindex(
         .property_int_value_cf(&cf, "rocksdb.estimate-num-keys")?
         .ok_or_else(|| anyhow!("Could not get estimated number of hashes"))?;
 
-    eprintln!("Estimated total hashes to process: {}", total_hashes);
+    eprintln!("Estimated total hashes to process for {}: {}", db_path, total_hashes);
 
     let mut lca_summary = LCASummary::default();
     let mut processed = 0;
@@ -495,6 +510,12 @@ fn process_revindex(
         .iterator_cf(&cf, rocksdb::IteratorMode::Start)
         .filter_map(Result::ok)
     {
+        // Check for cancellation
+        if cancel_flag.load(Ordering::SeqCst) {
+            eprintln!("Cancellation detected! Stopping iteration.");
+            break;
+        }
+
         if k.len() != 8 {
             continue;
         }
@@ -502,7 +523,7 @@ fn process_revindex(
         processed += 1;
         let current_percent = processed * 100 / total_hashes;
         if current_percent >= next_percent {
-            eprintln!("Processed {}% of hashes", current_percent);
+            eprintln!("Processed {}% of {} hashes", current_percent, db_path);
             next_percent = current_percent + 1;
         }
 
@@ -577,6 +598,10 @@ pub fn export_revindex_to_parquet(
     lca_info_path: Option<Utf8PathBuf>,
     rw: bool,
 ) -> Result<()> {
+    // set up ctrl-c signal handler
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    setup_ctrlc_handler(cancel_flag.clone())?;
+
     // load taxonomy if we have it
     let mut full_tax_map = HashMap::new();
 
@@ -602,7 +627,7 @@ pub fn export_revindex_to_parquet(
     db_paths
         .par_iter()
         .try_for_each::<_, Result<()>>(|db_path| {
-            let lca_summary = process_revindex(db_path, &sender, tax_map.as_ref(), rw)?;
+            let lca_summary = process_revindex(db_path, &sender, tax_map.as_ref(), rw, cancel_flag.clone())?;
             {
                 let mut global = global_summary.lock().unwrap();
                 global.merge(&lca_summary);
