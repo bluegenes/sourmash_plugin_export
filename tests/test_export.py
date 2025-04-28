@@ -11,6 +11,7 @@ import pandas as pd
 import sourmash_tst_utils as utils
 from sourmash_tst_utils import SourmashCommandFailed
 
+
 def get_test_data(filename):
     thisdir = os.path.dirname(__file__)
     return os.path.join(thisdir, "test-data", filename)
@@ -71,7 +72,7 @@ def test_rocksdb_revindex_to_parquet_test6_no_taxonomy(runtmp, capfd):
     assert "hash" in df.columns
     assert "dataset_names" in df.columns
     assert len(df) == 23910
-    # check that all columns are present 
+    # check that all columns are present
     assert len(df.columns) == 8
     # check some lines
     assert df[0, "hash"] == 15249706293397504
@@ -92,7 +93,15 @@ def test_rocksdb_revindex_to_parquet_test6_with_taxonomy(runtmp, capfd):
     out_lca = runtmp.output("test6.lca.csv")
 
     runtmp.sourmash(
-        "scripts", "revindex_to_parquet", revindex, "--output", out_parquet, "--taxonomy", tax_csv, "--lca-info", out_lca
+        "scripts",
+        "revindex_to_parquet",
+        revindex,
+        "--output",
+        out_parquet,
+        "--taxonomy",
+        tax_csv,
+        "--lca-info",
+        out_lca,
     )
 
     captured = capfd.readouterr()
@@ -139,11 +148,13 @@ def test_rocksdb_revindex_to_parquet_test6_with_taxonomy(runtmp, capfd):
     print(lca_df)
     expected_rows = [
         {"source": "test6.rocksdb", "rank": "family", "count": 8, "percent": 0.03},
-        {"source": "test6.rocksdb", "rank": "species", "count": 23901, "percent": 99.96},
+        {
+            "source": "test6.rocksdb",
+            "rank": "species",
+            "count": 23901,
+            "percent": 99.96,
+        },
         {"source": "test6.rocksdb", "rank": "order", "count": 1, "percent": 0.00},
-        {"source": "combined", "rank": "family", "count": 8, "percent": 0.03},
-        {"source": "combined", "rank": "order", "count": 1, "percent": 0.00},
-        {"source": "combined", "rank": "species", "count": 23901, "percent": 99.96},
     ]
 
     for expected_row in expected_rows:
@@ -151,7 +162,6 @@ def test_rocksdb_revindex_to_parquet_test6_with_taxonomy(runtmp, capfd):
             all(row[k] == expected_row[k] for k in expected_row)
             for row in lca_df.to_dict(orient="records")
         ), f"Expected row not found: {expected_row}"
-
 
 
 def test_rocksdb_revindex_to_parquet_test6_with_taxonomy_superkindom(runtmp, capfd):
@@ -175,7 +185,13 @@ def test_rocksdb_revindex_to_parquet_test6_with_taxonomy_superkindom(runtmp, cap
             writer.writerows(updated_rows)
 
     runtmp.sourmash(
-        "scripts", "revindex_to_parquet", revindex, "--output", out_parquet, "--taxonomy", tax_mod
+        "scripts",
+        "revindex_to_parquet",
+        revindex,
+        "--output",
+        out_parquet,
+        "--taxonomy",
+        tax_mod,
     )
 
     print(runtmp.last_result.out)
@@ -239,8 +255,9 @@ def test_rocksdb_revindex_to_parquet_test6_bad_tax_file(runtmp, capfd):
     print(captured.out)
     print(captured.err)
 
+    assert "Warning: row 1 has no taxonomy fields, skipping" in captured.err
     assert (
-        "Error: CSV deserialize error: record 1 (line: 2, byte: 15): missing field `ident`"
+        f"Error: Provided taxonomy file '{tax_csv}' is empty or failed to parse."
         in captured.err
     )
 
@@ -307,7 +324,16 @@ def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
     lca_csv = runtmp.output("test6.lca.csv")
 
     runtmp.sourmash(
-        "scripts", "revindex_to_parquet", revindex1, revindex2, "--output", out_parquet, "--taxonomy", tax_csv, "--lca-info", lca_csv
+        "scripts",
+        "revindex_to_parquet",
+        revindex1,
+        revindex2,
+        "--output",
+        out_parquet,
+        "--taxonomy",
+        tax_csv,
+        "--lca-info",
+        lca_csv,
     )
 
     captured = capfd.readouterr()
@@ -344,7 +370,7 @@ def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
     target_hash_2 = 2925290528259
     expected_names_2 = {
         "NC_009661.1 Shewanella baltica OS185 plasmid pS18501, complete sequence",
-        "NC_011665.1 Shewanella baltica OS223 plasmid pS22303, complete sequence"
+        "NC_011665.1 Shewanella baltica OS223 plasmid pS22303, complete sequence",
     }
 
     found_1 = False
@@ -365,7 +391,9 @@ def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
             if row["source"] == "podar-ref-subset.branch0_9_13.internal.rocksdb":
                 found_2 = True
                 assert set(row["dataset_names"]) == expected_names_2
-                assert not row["taxonomy_list"], "Expected taxonomy_list to be empty or None"
+                assert not row["taxonomy_list"], (
+                    "Expected taxonomy_list to be empty or None"
+                )
                 assert row["lca_lineage"] in (None, ""), "Expected no lca_lineage"
                 assert row["lca_rank"] in (None, ""), "Expected no lca_rank"
                 assert row["scaled"] == 100000
@@ -373,10 +401,12 @@ def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
                 found_3 = True
                 assert set(row["dataset_names"]) == expected_names_1
                 assert row["scaled"] == 1000
-                assert ';'.join(row["taxonomy_list"]) == expected_tax_1
+                assert ";".join(row["taxonomy_list"]) == expected_tax_1
 
     assert found_1, f"Did not find a row with hash {target_hash_1}"
-    assert found_2, f"Did not find a row with hash {target_hash_2} in podar-ref-subset.branch0_9_13.internal.rocksdb"
+    assert found_2, (
+        f"Did not find a row with hash {target_hash_2} in podar-ref-subset.branch0_9_13.internal.rocksdb"
+    )
     assert found_3, f"Did not find a row with hash {target_hash_2} in test6.rocksdb"
 
     # check that the lca file was created
@@ -386,9 +416,19 @@ def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
     print(lca_df)
     expected_rows = [
         {"source": "test6.rocksdb", "rank": "family", "count": 8, "percent": 0.03},
-        {"source": "test6.rocksdb", "rank": "species", "count": 23901, "percent": 99.96},
+        {
+            "source": "test6.rocksdb",
+            "rank": "species",
+            "count": 23901,
+            "percent": 99.96,
+        },
         {"source": "test6.rocksdb", "rank": "order", "count": 1, "percent": 0.00},
-        {"source": "podar-ref-subset.branch0_9_13.internal.rocksdb", "rank": "unclassified", "count": 84, "percent": 100.00},
+        {
+            "source": "podar-ref-subset.branch0_9_13.internal.rocksdb",
+            "rank": "unclassified",
+            "count": 84,
+            "percent": 100.00,
+        },
         {"source": "combined", "rank": "family", "count": 8, "percent": 0.03},
         {"source": "combined", "rank": "order", "count": 1, "percent": 0.00},
         {"source": "combined", "rank": "species", "count": 23901, "percent": 99.61},

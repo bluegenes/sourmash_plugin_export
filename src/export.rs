@@ -290,7 +290,7 @@ impl fmt::Display for LCASummary {
     }
 }
 
-pub fn write_lca_info(
+fn write_lca_info(
     path: Option<&Utf8Path>,
     all_summaries: &[(String, LCASummary)],
     combined_summary: &LCASummary,
@@ -318,7 +318,10 @@ pub fn write_lca_info(
         for (source, summary) in all_summaries {
             summary.write_csv(&mut wtr, source)?;
         }
-        combined_summary.write_csv(&mut wtr, "combined")?;
+        // write combined summary if >1 input
+        if all_summaries.len() > 1 {
+            combined_summary.write_csv(&mut wtr, "combined")?;
+        }
         wtr.flush()?;
     }
 
@@ -327,6 +330,7 @@ pub fn write_lca_info(
 
 #[derive(Debug, Deserialize)]
 struct TaxonomyRow {
+    #[serde(alias = "identifier", alias = "identifier", alias = "accession")]
     ident: String,
     // allow for both "domain" and "superkingdom" as keys
     #[serde(alias = "superkingdom")]
@@ -377,24 +381,54 @@ fn load_taxonomy_map(path: Utf8PathBuf) -> Result<HashMap<String, String>> {
     let mut rdr = csv::Reader::from_reader(reader);
 
     let mut tax_map = HashMap::new();
+    let mut total_rows = 0;
+    let mut failed_rows = 0;
 
     for result in rdr.deserialize() {
-        let row: TaxonomyRow = result?;
-        let taxonomy = [
-            row.domain,
-            row.phylum,
-            row.class,
-            row.order,
-            row.family,
-            row.genus,
-            row.species,
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .join(";");
+        total_rows += 1;
+        match result {
+            Ok(row) => {
+                let row: TaxonomyRow = row;
 
-        tax_map.insert(row.ident, taxonomy);
+                // Check if at least one taxonomy field is present
+                let has_taxonomy = row.domain.is_some()
+                    || row.phylum.is_some()
+                    || row.class.is_some()
+                    || row.order.is_some()
+                    || row.family.is_some()
+                    || row.genus.is_some()
+                    || row.species.is_some();
+
+                if !has_taxonomy {
+                    failed_rows += 1;
+                    eprintln!(
+                        "Warning: row {} has no taxonomy fields, skipping accession '{}'.",
+                        total_rows, row.ident
+                    );
+                    continue;
+                }
+
+                let taxonomy = [
+                    row.domain,
+                    row.phylum,
+                    row.class,
+                    row.order,
+                    row.family,
+                    row.genus,
+                    row.species,
+                ]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join(";");
+
+                tax_map.insert(row.ident, taxonomy);
+            }
+            Err(e) => {
+                failed_rows += 1;
+                eprintln!("Warning: failed to parse row {}: {}", total_rows, e);
+            }
+        }
     }
 
     if tax_map.is_empty() {
@@ -403,6 +437,12 @@ fn load_taxonomy_map(path: Utf8PathBuf) -> Result<HashMap<String, String>> {
             path
         );
     }
+
+    eprintln!(
+        "Loaded {} taxonomy entries ({} rows failed to parse).",
+        tax_map.len(),
+        failed_rows
+    );
 
     Ok(tax_map)
 }
@@ -438,13 +478,32 @@ fn process_revindex(
     let db = &revindex.db;
     let cf = db.cf_handle("hashes").expect("Missing 'hashes' CF");
 
+    // estimate total hashes to process
+    // this is not exact, but should be close enough
+    let total_hashes = db
+        .property_int_value_cf(&cf, "rocksdb.estimate-num-keys")?
+        .ok_or_else(|| anyhow!("Could not get estimated number of hashes"))?;
+
+    eprintln!("Estimated total hashes to process: {}", total_hashes);
+
     let mut lca_summary = LCASummary::default();
+    let mut processed = 0;
+    let mut next_percent = 1;
+    eprintln!("Iterating across hashes...");
+
     for (k, v) in db
         .iterator_cf(&cf, rocksdb::IteratorMode::Start)
         .filter_map(Result::ok)
     {
         if k.len() != 8 {
             continue;
+        }
+
+        processed += 1;
+        let current_percent = processed * 100 / total_hashes;
+        if current_percent >= next_percent {
+            eprintln!("Processed {}% of hashes", current_percent);
+            next_percent = current_percent + 1;
         }
 
         let hash = LittleEndian::read_u64(&k);

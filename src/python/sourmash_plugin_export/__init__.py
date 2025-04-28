@@ -72,11 +72,11 @@ class RevIndexToParquet(CommandLinePlugin):
             help="One or more taxonomy CSV files (optional).",
         )
         p.add_argument(
-            '--lca-info',
-            help='Output an LCA summary to this CSV file.',
+            "--lca-info",
+            help="Output an LCA summary to this CSV file.",
             default=None,
             type=str,
-        )   
+        )
         p.add_argument(
             "-c",
             "--cores",
