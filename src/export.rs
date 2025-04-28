@@ -16,8 +16,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
@@ -342,6 +342,10 @@ fn write_lca_info(
     Ok(())
 }
 
+fn normalize_accession(s: &str) -> &str {
+    s.split('.').next().unwrap_or(s)
+}
+
 #[derive(Debug, Deserialize)]
 struct TaxonomyRow {
     #[serde(alias = "identifier", alias = "identifier", alias = "accession")]
@@ -435,8 +439,8 @@ fn load_taxonomy_map(path: Utf8PathBuf) -> Result<HashMap<String, String>> {
                 .flatten()
                 .collect::<Vec<_>>()
                 .join(";");
-
-                tax_map.insert(row.ident, taxonomy);
+                let ident = normalize_accession(&row.ident);
+                tax_map.insert(ident.to_string(), taxonomy);
             }
             Err(e) => {
                 failed_rows += 1;
@@ -499,7 +503,10 @@ fn process_revindex(
         .property_int_value_cf(&cf, "rocksdb.estimate-num-keys")?
         .ok_or_else(|| anyhow!("Could not get estimated number of hashes"))?;
 
-    eprintln!("Estimated total hashes to process for {}: {}", db_path, total_hashes);
+    eprintln!(
+        "Estimated total hashes to process for {}: {}",
+        db_path, total_hashes
+    );
 
     let mut lca_summary = LCASummary::default();
     let mut processed = 0;
@@ -558,6 +565,7 @@ fn process_revindex(
             let taxonomy_list: Vec<String> = dataset_names
                 .iter()
                 .filter_map(|name| name.split_whitespace().next())
+                .map(|accession| normalize_accession(accession))
                 .filter_map(|accession| tax_map.get(accession))
                 .cloned()
                 .collect();
@@ -627,7 +635,8 @@ pub fn export_revindex_to_parquet(
     db_paths
         .par_iter()
         .try_for_each::<_, Result<()>>(|db_path| {
-            let lca_summary = process_revindex(db_path, &sender, tax_map.as_ref(), rw, cancel_flag.clone())?;
+            let lca_summary =
+                process_revindex(db_path, &sender, tax_map.as_ref(), rw, cancel_flag.clone())?;
             {
                 let mut global = global_summary.lock().unwrap();
                 global.merge(&lca_summary);
