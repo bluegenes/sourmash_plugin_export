@@ -91,11 +91,11 @@ fn string_list_array(values: &[Vec<String>]) -> Result<ListArray<i32>, arrow2::e
 
 /// Returns: schema and chunk (i.e., row group)
 fn convert_to_batch(records: &[ArrowRecord]) -> ArrowResult<(Schema, Chunk<Box<dyn Array>>)> {
-    let hashes = UInt64Array::from_slice(&records.iter().map(|r| r.hash).collect::<Vec<_>>());
-    let ksizes = UInt32Array::from_slice(&records.iter().map(|r| r.ksize).collect::<Vec<_>>());
-    let scaleds = UInt32Array::from_slice(&records.iter().map(|r| r.scaled).collect::<Vec<_>>());
+    let hashes = UInt64Array::from_slice(records.iter().map(|r| r.hash).collect::<Vec<_>>());
+    let ksizes = UInt32Array::from_slice(records.iter().map(|r| r.ksize).collect::<Vec<_>>());
+    let scaleds = UInt32Array::from_slice(records.iter().map(|r| r.scaled).collect::<Vec<_>>());
     let source = Utf8Array::<i32>::from_slice(
-        &records
+        records
             .iter()
             .map(|r| r.source.as_str())
             .collect::<Vec<_>>(),
@@ -163,7 +163,7 @@ fn start_arrow_writer_thread(
 
         // Prime schema from empty batch
         let (schema, _) = convert_to_batch(&[])?;
-        let mut writer = FileWriter::try_new(file, schema.clone(), options.clone())?;
+        let mut writer = FileWriter::try_new(file, schema.clone(), options)?;
 
         for record in receiver {
             buffer.push(record);
@@ -174,7 +174,7 @@ fn start_arrow_writer_thread(
                 let row_groups = RowGroupIterator::try_new(
                     std::iter::once(Ok(chunk)),
                     &schema,
-                    options.clone(),
+                    options,
                     encodings,
                 )?;
 
@@ -565,7 +565,7 @@ fn process_revindex(
             let taxonomy_list: Vec<String> = dataset_names
                 .iter()
                 .filter_map(|name| name.split_whitespace().next())
-                .map(|accession| normalize_accession(accession))
+                .map(normalize_accession)
                 .filter_map(|accession| tax_map.get(accession))
                 .cloned()
                 .collect();
@@ -595,7 +595,7 @@ fn process_revindex(
 
         sender.send(record)?;
     }
-    return Ok(lca_summary);
+    Ok(lca_summary)
 }
 
 // main function
