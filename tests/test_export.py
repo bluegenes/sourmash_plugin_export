@@ -544,6 +544,22 @@ def test_rocksdb_revindex_to_parquet_test6_multiple_revindex_same_scaled(runtmp,
             "count": 84,
             "percent": 100.00,
         },
+        {
+            "source": "combined_k31_sc100000",
+            "ksize": 31,
+            "scaled": 100000,
+            "lca_rank": "species",
+            "count": 228,
+            "percent": 73.08,
+        },
+        {
+            "source": "combined_k31_sc100000",
+            "ksize": 31,
+            "scaled": 100000,
+            "lca_rank": "unclassified",
+            "count": 84,
+            "percent": 26.92,
+        },
     ]
     for expected_row in expected_rows:
         assert any(

@@ -393,7 +393,7 @@ fn write_lca_info(path: Option<&Utf8Path>, all_summaries: &[(String, LCASummary)
             combined.merge(summary);
         }
 
-        let label = format!("combined_k{ksize}_s{scaled}");
+        let label = format!("combined_k{ksize}_sc{scaled}");
         eprintln!("Combined summary for k={ksize}, scaled={scaled}:");
         eprintln!("{combined}");
 
