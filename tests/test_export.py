@@ -147,14 +147,14 @@ def test_rocksdb_revindex_to_parquet_test6_with_taxonomy(runtmp, capfd):
     lca_df = pd.read_csv(out_lca)
     print(lca_df)
     expected_rows = [
-        {"source": "test6.rocksdb", "rank": "family", "count": 8, "percent": 0.03},
+        {"source": "test6.rocksdb", "lca_rank": "family", "count": 8, "percent": 0.03},
         {
             "source": "test6.rocksdb",
-            "rank": "species",
+            "lca_rank": "species",
             "count": 23901,
             "percent": 99.96,
         },
-        {"source": "test6.rocksdb", "rank": "order", "count": 1, "percent": 0.00},
+        {"source": "test6.rocksdb", "lca_rank": "order", "count": 1, "percent": 0.00},
     ]
 
     for expected_row in expected_rows:
@@ -316,7 +316,7 @@ def test_rocksdb_revindex_to_parquet_test6_empty_tax_file(runtmp, capfd):
     assert f"Error: Provided taxonomy file '{tax_csv}' is empty or failed to parse."
 
 
-def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
+def test_rocksdb_revindex_to_parquet_test6_multiple_revindex_diff_scaled(runtmp, capfd):
     revindex1 = get_test_data("test6.rocksdb")
     revindex2 = get_test_data("podar-ref-subset.branch0_9_13.internal.rocksdb")
     tax_csv = get_test_data("test6.taxonomy.csv")
@@ -415,27 +415,138 @@ def test_rocksdb_revindex_to_parquet_test6_multiple_revindex(runtmp, capfd):
     lca_df = pd.read_csv(lca_csv)
     print(lca_df)
     expected_rows = [
-        {"source": "test6.rocksdb", "rank": "family", "count": 8, "percent": 0.03},
+        {"source": "test6.rocksdb", "lca_rank": "family", "count": 8, "percent": 0.03},
         {
             "source": "test6.rocksdb",
-            "rank": "species",
+            "lca_rank": "species",
             "count": 23901,
             "percent": 99.96,
         },
-        {"source": "test6.rocksdb", "rank": "order", "count": 1, "percent": 0.00},
+        {"source": "test6.rocksdb", "lca_rank": "order", "count": 1, "percent": 0.00},
         {
             "source": "podar-ref-subset.branch0_9_13.internal.rocksdb",
-            "rank": "unclassified",
+            "lca_rank": "unclassified",
             "count": 84,
             "percent": 100.00,
         },
-        {"source": "combined", "rank": "family", "count": 8, "percent": 0.03},
-        {"source": "combined", "rank": "order", "count": 1, "percent": 0.00},
-        {"source": "combined", "rank": "species", "count": 23901, "percent": 99.61},
-        {"source": "combined", "rank": "unclassified", "count": 84, "percent": 0.35},
     ]
     for expected_row in expected_rows:
         assert any(
             all(row[k] == expected_row[k] for k in expected_row)
             for row in lca_df.to_dict(orient="records")
-        ), f"Expected row not found: {expected_row}"
+        ), f"Expected row not found: {expected_row}. row found: {row}"
+
+
+def test_rocksdb_revindex_to_parquet_test6_multiple_revindex_same_scaled(runtmp, capfd):
+    revindex1 = get_test_data("test6.k31-sc100_000.rocksdb")
+    revindex2 = get_test_data("podar-ref-subset.branch0_9_13.internal.rocksdb")
+    tax_csv = get_test_data("test6.taxonomy.csv")
+    out_parquet = runtmp.output("combined.parquet")
+    lca_csv = runtmp.output("combined.lca.csv")
+
+    runtmp.sourmash(
+        "scripts",
+        "revindex_to_parquet",
+        revindex1,
+        revindex2,
+        "--output",
+        out_parquet,
+        "--taxonomy",
+        tax_csv,
+        "--lca-info",
+        lca_csv,
+    )
+
+    captured = capfd.readouterr()
+    print(captured.out)
+    print(captured.err)
+
+    assert os.path.exists(out_parquet), f"Expected output file at {out_parquet}."
+
+    # verify content with Polars
+    df = pl.read_parquet(out_parquet)
+    # print the first few rows
+    print(df.head())
+    assert "hash" in df.columns
+    assert "dataset_names" in df.columns
+    assert len(df.columns) == 8
+    assert len(df) == 312
+    # check a hash found in both revindexes
+    target_hash = 2925290528259
+    expected_names_1 = {
+        "GCF_000021665.1 Shewanella baltica OS223",
+        "GCF_000017325.1 Shewanella baltica OS185",
+    }
+    expected_tax_1 = (
+        "d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;"
+        "o__Enterobacterales;f__Shewanellaceae;g__Shewanella;"
+        "s__Shewanella baltica;" * 2
+    ).rstrip(";")
+    expected_lca_lineage_1 = (
+        "d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;"
+        "o__Enterobacterales;f__Shewanellaceae;g__Shewanella;"
+        "s__Shewanella baltica"
+    )
+
+    expected_names_2 = {
+        "NC_009661.1 Shewanella baltica OS185 plasmid pS18501, complete sequence",
+        "NC_011665.1 Shewanella baltica OS223 plasmid pS22303, complete sequence",
+    }
+
+    found_1 = False
+    found_2 = False
+
+    for row in df.iter_rows(named=True):
+        if row["hash"] == target_hash:
+            print(row)
+            if row["source"] == "test6.k31-sc100_000.rocksdb":
+                found_1 = True
+                assert set(row["dataset_names"]) == expected_names_1
+                assert row["scaled"] == 100000
+                assert ";".join(row["taxonomy_list"]) == expected_tax_1
+                assert row["lca_lineage"] == expected_lca_lineage_1
+                assert row["lca_rank"] == "species"
+            # this hash is actually found in both revindexes
+            elif row["source"] == "podar-ref-subset.branch0_9_13.internal.rocksdb":
+                found_2 = True
+                assert set(row["dataset_names"]) == expected_names_2
+                assert not row["taxonomy_list"], (
+                    "Expected taxonomy_list to be empty or None"
+                )
+                assert row["lca_lineage"] in (None, ""), "Expected no lca_lineage"
+                assert row["lca_rank"] in (None, ""), "Expected no lca_rank"
+                assert row["scaled"] == 100000
+
+    assert found_1, f"Did not find a row with hash {target_hash} in test6.k31-sc100_000.rocksdb"
+    assert found_2, (
+        f"Did not find a row with hash {target_hash} in podar-ref-subset.branch0_9_13.internal.rocksdb"
+    )
+
+    # check that the lca file was created
+    assert os.path.exists(lca_csv), f"Expected output file at {lca_csv}."
+    # check that the lca file contains the expected columns
+    lca_df = pd.read_csv(lca_csv)
+    print(lca_df)
+    expected_rows = [
+        {
+            "source": "test6.k31-sc100_000.rocksdb",
+            "ksize": 31,
+            "scaled": 100000,
+            "lca_rank": "species",
+            "count": 228,
+            "percent": 100.00,
+        },
+        {
+            "source": "podar-ref-subset.branch0_9_13.internal.rocksdb",
+            "ksize": 31,
+            "scaled": 100000,
+            "lca_rank": "unclassified",
+            "count": 84,
+            "percent": 100.00,
+        },
+    ]
+    for expected_row in expected_rows:
+        assert any(
+            all(row[k] == expected_row[k] for k in expected_row)
+            for row in lca_df.to_dict(orient="records")
+        ), f"Expected row not found: {expected_row}. row found: {row}"

@@ -12,7 +12,7 @@ use csv::Writer;
 use rayon::prelude::*;
 use serde::Deserialize;
 use sourmash::index::revindex::{Datasets, RevIndex, RevIndexOps};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
@@ -212,9 +212,19 @@ struct LCASummary {
     rank_counts: HashMap<String, usize>,
     none_count: usize,
     total: usize,
+    ksize: u32,
+    scaled: u32,
 }
 
 impl LCASummary {
+    pub fn new(ksize: u32, scaled: u32) -> Self {
+        Self {
+            ksize,
+            scaled,
+            ..Default::default()
+        }
+    }
+
     fn add_rank(&mut self, rank: Option<&str>) {
         self.total += 1;
         if let Some(r) = rank {
@@ -232,7 +242,7 @@ impl LCASummary {
         self.total += other.total;
     }
 
-    fn to_csv_rows(&self, source: &str) -> Vec<(String, String, usize, f64)> {
+    fn to_csv_rows(&self, source: &str) -> Vec<(String, u32, u32, String, usize, f64)> {
         let mut rows = self
             .rank_counts
             .iter()
@@ -254,19 +264,29 @@ impl LCASummary {
         }
 
         rows.into_iter()
-            .map(|(rank, count, pct)| (source.to_string(), rank, count, pct))
+            .map(|(rank, count, pct)| {
+                (
+                    source.to_string(),
+                    self.ksize,
+                    self.scaled,
+                    rank,
+                    count,
+                    pct,
+                )
+            })
             .collect()
     }
 
-    pub const CSV_HEADER: [&'static str; 4] = ["source", "rank", "count", "percent"];
+    pub const CSV_HEADER: [&'static str; 6] =
+        ["source", "ksize", "scaled", "lca_rank", "count", "percent"];
 
     pub fn write_csv<W: std::io::Write>(
         &self,
         writer: &mut csv::Writer<W>,
         source: &str,
     ) -> Result<()> {
-        for (src, rank, count, pct) in self.to_csv_rows(source) {
-            writer.serialize((src, rank, count, format!("{:.2}", pct)))?;
+        for (src, ksize, scaled, rank, count, pct) in self.to_csv_rows(source) {
+            writer.serialize((src, ksize, scaled, rank, count, format!("{:.2}", pct)))?;
         }
         Ok(())
     }
@@ -304,45 +324,66 @@ impl fmt::Display for LCASummary {
     }
 }
 
-fn write_lca_info(
-    path: Option<&Utf8Path>,
-    all_summaries: &[(String, LCASummary)],
-    combined_summary: &LCASummary,
-) -> Result<()> {
+fn write_lca_info(path: Option<&Utf8Path>, all_summaries: &[(String, LCASummary)]) -> Result<()> {
     if all_summaries.is_empty() {
         return Ok(()); // no summaries to print or write
     }
 
-    // always print individual summaries
+    // group summaries by ksize and scaled
+    let mut grouped: BTreeMap<(u32, u32), Vec<(String, LCASummary)>> = BTreeMap::new();
     for (source, summary) in all_summaries {
-        eprintln!("{source}:");
-        eprintln!("{summary}");
+        grouped
+            .entry((summary.ksize, summary.scaled))
+            .or_default()
+            .push((source.clone(), summary.clone()));
     }
 
-    // only print merged summary if >1 input
-    if all_summaries.len() > 1 {
-        eprintln!("Combined LCA summary:");
-        eprintln!("{combined_summary}");
+    // Open writer if writing CSV
+    let mut wtr = path.map(Writer::from_path).transpose()?;
+    if let Some(ref mut writer) = wtr {
+        writer.write_record(LCASummary::CSV_HEADER)?;
     }
 
-    // only write CSV if a path was provided
-    if let Some(path) = path {
-        let mut wtr = Writer::from_path(path)?;
-        wtr.write_record(LCASummary::CSV_HEADER)?;
-        for (source, summary) in all_summaries {
-            summary.write_csv(&mut wtr, source)?;
+    // first, just iterate + write individual summaries
+    // bc always want these first
+    for group in grouped.values() {
+        for (source, summary) in group {
+            eprintln!("{source}:");
+            eprintln!("{summary}");
+            if let Some(ref mut writer) = wtr {
+                summary.write_csv(writer, source)?;
+            }
         }
-        // write combined summary if >1 input
-        if all_summaries.len() > 1 {
-            combined_summary.write_csv(&mut wtr, "combined")?;
+    }
+
+    // now iterate over grouped summaries, combining them and printing/writing
+    for ((ksize, scaled), group) in &grouped {
+        if group.len() <= 1 {
+            continue;
         }
-        wtr.flush()?;
+
+        let mut combined = LCASummary::new(*ksize, *scaled);
+        for (_, summary) in group {
+            combined.merge(summary);
+        }
+
+        let label = format!("combined_k{ksize}_s{scaled}");
+        eprintln!("Combined summary for k={ksize}, scaled={scaled}:");
+        eprintln!("{combined}");
+
+        if let Some(ref mut writer) = wtr {
+            combined.write_csv(writer, &label)?;
+        }
+    }
+
+    if let Some(ref mut writer) = wtr {
+        writer.flush()?;
     }
 
     Ok(())
 }
 
-fn normalize_accession(s: &str) -> &str {
+fn strip_accession_version(s: &str) -> &str {
     s.split('.').next().unwrap_or(s)
 }
 
@@ -439,7 +480,7 @@ fn load_taxonomy_map(path: Utf8PathBuf) -> Result<HashMap<String, String>> {
                 .flatten()
                 .collect::<Vec<_>>()
                 .join(";");
-                let ident = normalize_accession(&row.ident);
+                let ident = strip_accession_version(&row.ident);
                 tax_map.insert(ident.to_string(), taxonomy);
             }
             Err(e) => {
@@ -508,7 +549,7 @@ fn process_revindex(
         db_path, total_hashes
     );
 
-    let mut lca_summary = LCASummary::default();
+    let mut lca_summary = LCASummary::new(ksize, *scaled);
     let mut processed = 0;
     let mut next_percent = 1;
     eprintln!("Iterating across hashes...");
@@ -565,7 +606,7 @@ fn process_revindex(
             let taxonomy_list: Vec<String> = dataset_names
                 .iter()
                 .filter_map(|name| name.split_whitespace().next())
-                .map(normalize_accession)
+                .map(strip_accession_version)
                 .filter_map(|accession| tax_map.get(accession))
                 .cloned()
                 .collect();
@@ -628,7 +669,6 @@ pub fn export_revindex_to_parquet(
     let (sender, handle) = start_arrow_writer_thread(out_path, 100_000)?;
 
     // init LCA summary
-    let global_summary = Arc::new(Mutex::new(LCASummary::default()));
     let all_summaries = Arc::new(Mutex::new(Vec::new()));
 
     // parallelize across all input revindex files
@@ -637,10 +677,6 @@ pub fn export_revindex_to_parquet(
         .try_for_each::<_, Result<()>>(|db_path| {
             let lca_summary =
                 process_revindex(db_path, &sender, tax_map.as_ref(), rw, cancel_flag.clone())?;
-            {
-                let mut global = global_summary.lock().unwrap();
-                global.merge(&lca_summary);
-            }
             {
                 let mut all = all_summaries.lock().unwrap();
                 all.push((db_path, lca_summary));
@@ -658,9 +694,7 @@ pub fn export_revindex_to_parquet(
         .map(|(p, s)| (p.file_name().unwrap().to_string(), s.clone()))
         .collect();
 
-    let global_summary_guard = global_summary.lock().unwrap();
-
-    write_lca_info(lca_info_path.as_deref(), &summaries, &global_summary_guard)?;
+    write_lca_info(lca_info_path.as_deref(), &summaries)?;
 
     Ok(())
 }

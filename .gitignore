@@ -3,6 +3,7 @@
 *.sig
 *.sig.gz
 *.parquet
+*.png
 
 /target
 
