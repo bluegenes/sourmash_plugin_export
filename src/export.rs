@@ -210,7 +210,8 @@ fn start_arrow_writer_thread(
 #[derive(Default, Clone)]
 struct LCASummary {
     rank_counts: HashMap<String, usize>,
-    none_count: usize,
+    no_lca_count: usize,
+    unclassified_count: usize,
     total: usize,
     ksize: u32,
     scaled: u32,
@@ -225,12 +226,23 @@ impl LCASummary {
         }
     }
 
-    fn add_rank(&mut self, rank: Option<&str>) {
+    fn add_rank(&mut self, taxonomy_list: Option<&Vec<String>>, lca_rank: Option<&str>) {
         self.total += 1;
-        if let Some(r) = rank {
-            *self.rank_counts.entry(r.to_string()).or_default() += 1;
-        } else {
-            self.none_count += 1;
+
+        match taxonomy_list {
+            Some(list) if list.is_empty() => {
+                self.unclassified_count += 1;
+            }
+            Some(_) => {
+                if let Some(r) = lca_rank {
+                    *self.rank_counts.entry(r.to_string()).or_default() += 1;
+                } else {
+                    self.no_lca_count += 1;
+                }
+            }
+            None => {
+                self.unclassified_count += 1;
+            }
         }
     }
 
@@ -238,7 +250,8 @@ impl LCASummary {
         for (rank, count) in &other.rank_counts {
             *self.rank_counts.entry(rank.clone()).or_default() += count;
         }
-        self.none_count += other.none_count;
+        self.unclassified_count += other.unclassified_count;
+        self.no_lca_count += other.no_lca_count;
         self.total += other.total;
     }
 
@@ -255,11 +268,19 @@ impl LCASummary {
             })
             .collect::<Vec<_>>();
 
-        if self.none_count > 0 {
+        if self.no_lca_count > 0 {
+            rows.push((
+                "no_lca".into(),
+                self.no_lca_count,
+                (self.no_lca_count as f64 / self.total as f64) * 100.0,
+            ));
+        }
+
+        if self.unclassified_count > 0 {
             rows.push((
                 "unclassified".into(),
-                self.none_count,
-                (self.none_count as f64 / self.total as f64) * 100.0,
+                self.unclassified_count,
+                (self.unclassified_count as f64 / self.total as f64) * 100.0,
             ));
         }
 
@@ -314,9 +335,14 @@ impl fmt::Display for LCASummary {
             writeln!(f, "{rank}: {count} ({pct:.1}%)")?;
         }
 
-        if self.none_count > 0 {
-            let pct = (self.none_count as f64 / self.total as f64) * 100.0;
-            writeln!(f, "unclassified: {} ({:.1}%)", self.none_count, pct)?;
+        if self.no_lca_count > 0 {
+            let pct = (self.no_lca_count as f64 / self.total as f64) * 100.0;
+            writeln!(f, "no_lca: {} ({:.1}%)", self.no_lca_count, pct)?;
+        }
+
+        if self.unclassified_count > 0 {
+            let pct = (self.unclassified_count as f64 / self.total as f64) * 100.0;
+            writeln!(f, "unclassified: {} ({:.1}%)", self.unclassified_count, pct)?;
         }
 
         writeln!(f, "Total hashes: {}", self.total)?;
@@ -621,7 +647,7 @@ fn process_revindex(
             (None, None, None)
         };
 
-        lca_summary.add_rank(lca_rank.as_deref());
+        lca_summary.add_rank(taxonomy_list.as_ref(), lca_rank.as_deref());
 
         let record = ArrowRecord {
             hash,
