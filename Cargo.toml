@@ -23,7 +23,7 @@ anyhow = "1.0.98"
 #sourmash = { version = "0.19.0", features = ["branchwater"]}
 sourmash = { git = "https://github.com/dib-lab/sourmash", branch = "ctb_hacky_rocksdb", features = ["branchwater"] }
 
-camino = "1.1.7"
+camino = "1.2.1"
 
 [profile.release]
 #target-cpu=native
